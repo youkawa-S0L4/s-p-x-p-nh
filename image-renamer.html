@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Sắp xếp & đổi tên ảnh</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+  :root{
+    --bg:#100D18; --bg-elev:#1D1830; --fg:#F5F2FA; --muted:#9A93AC; --line:#2A2440;
+    --accent:#A78BFA; --accent2:#22D3EE;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;color:var(--fg);font-family:'Inter',sans-serif;-webkit-tap-highlight-color:transparent;}
+  body{
+    background:
+      radial-gradient(1000px 500px at 10% -10%, rgba(167,139,250,.22), transparent 60%),
+      radial-gradient(800px 450px at 95% 0%, rgba(34,211,238,.14), transparent 55%),
+      var(--bg);
+    min-height:100vh; padding-bottom:110px;
+  }
+  header{padding:26px 20px 10px;}
+  h1{
+    font-family:'Fraunces',serif;font-weight:600;font-size:clamp(24px,7vw,32px);margin:0 0 6px;
+    background:linear-gradient(90deg,#FF6B6B,var(--accent) 55%,var(--accent2));
+    -webkit-background-clip:text;background-clip:text;color:transparent;letter-spacing:-.01em;
+  }
+  header p{color:var(--muted);font-size:13px;line-height:1.6;margin:0;max-width:520px;}
+
+  .panel{padding:16px 20px;}
+  .picker-btn{
+    display:flex;align-items:center;justify-content:center;gap:8px;
+    width:100%;padding:16px;border-radius:14px;border:1.5px dashed var(--line);
+    background:var(--bg-elev);color:var(--fg);font-size:14px;font-weight:600;
+  }
+  input[type=file]{display:none;}
+
+  .settings{
+    display:flex;gap:12px;margin-top:14px;
+  }
+  .field{flex:1;}
+  .field label{display:block;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;}
+  .field input{
+    width:100%;padding:10px 12px;border-radius:10px;border:1px solid var(--line);
+    background:var(--bg-elev);color:var(--fg);font-size:14px;
+  }
+
+  .hint{font-size:12px;color:var(--muted);margin-top:12px;line-height:1.6;}
+  .hint b{color:var(--fg);}
+
+  .count-row{display:flex;justify-content:space-between;align-items:center;padding:22px 20px 8px;}
+  .count-row span{font-size:13px;color:var(--muted);}
+  .count-row button{
+    font-size:12px;color:var(--muted);background:none;border:none;text-decoration:underline;
+  }
+
+  .list{padding:0 20px;display:flex;flex-direction:column;gap:8px;}
+  .item{
+    display:flex;align-items:center;gap:12px;
+    background:var(--bg-elev);border-radius:12px;padding:8px;
+  }
+  .item img{width:52px;height:52px;object-fit:cover;border-radius:8px;flex:none;background:#000;}
+  .item .names{flex:1;min-width:0;}
+  .item .old{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .item .new{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .item .arrows{display:flex;flex-direction:column;gap:3px;flex:none;}
+  .item .arrows button{
+    width:30px;height:26px;border-radius:7px;border:none;background:#2A2440;color:var(--fg);font-size:13px;
+  }
+  .item .arrows button:disabled{opacity:.25;}
+
+  .empty{padding:50px 20px;text-align:center;color:var(--muted);font-size:13px;line-height:1.8;}
+
+  .bottom-bar{
+    position:fixed;left:0;right:0;bottom:0;
+    padding:14px 20px calc(14px + env(safe-area-inset-bottom));
+    background:rgba(16,13,24,.9);backdrop-filter:blur(10px);
+    border-top:1px solid var(--line);
+    display:flex;gap:10px;align-items:center;
+  }
+  .bottom-bar .status{flex:1;font-size:12px;color:var(--muted);}
+  .download-btn{
+    padding:13px 22px;border-radius:24px;border:none;font-weight:700;font-size:14px;color:#100D18;
+    background:linear-gradient(135deg,var(--accent),#FF6B6B);
+  }
+  .download-btn:disabled{opacity:.4;}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Sắp xếp & đổi tên ảnh</h1>
+  <p>Chọn nhiều ảnh, sửa lại đúng thứ tự đọc bằng nút mũi tên, rồi tải về 1 file .zip đã đánh số sẵn (001, 002, 003...) — không cần đổi tên tay từng ảnh nữa.</p>
+</header>
+
+<div class="panel">
+  <button class="picker-btn" id="pick-btn">📁 Chọn ảnh từ thư viện</button>
+  <input type="file" id="file-input" multiple accept="image/*">
+
+  <div class="settings">
+    <div class="field">
+      <label>Số bắt đầu</label>
+      <input type="number" id="start-num" value="1" min="1">
+    </div>
+    <div class="field">
+      <label>Tiền tố tên file</label>
+      <input type="text" id="prefix" placeholder="để trống nếu không cần" value="">
+    </div>
+  </div>
+  <p class="hint">Ảnh vừa chọn sẽ tự sắp theo thứ tự tên file gốc trước — nếu chưa đúng, dùng nút <b>▲ ▼</b> bên phải từng ảnh để sửa lại thứ tự đọc.</p>
+</div>
+
+<div class="count-row" id="count-row" style="display:none">
+  <span id="count-text"></span>
+  <button id="reset-btn">Xoá & chọn lại</button>
+</div>
+
+<div class="list" id="list"></div>
+<div class="empty" id="empty-state">Chưa chọn ảnh nào.</div>
+
+<div class="bottom-bar" id="bottom-bar" style="display:none">
+  <span class="status" id="status-text"></span>
+  <button class="download-btn" id="download-btn">Tải .zip</button>
+</div>
+
+<script>
+let items = []; // {file, id}
+
+function naturalCompare(a, b){
+  const ax = a.match(/(\d+|\D+)/g) || [];
+  const bx = b.match(/(\d+|\D+)/g) || [];
+  const len = Math.max(ax.length, bx.length);
+  for (let i = 0; i < len; i++){
+    const as = ax[i] || '', bs = bx[i] || '';
+    const an = parseInt(as, 10), bn = parseInt(bs, 10);
+    if (!isNaN(an) && !isNaN(bn)) { if (an !== bn) return an - bn; }
+    else if (as !== bs) return as < bs ? -1 : 1;
+  }
+  return 0;
+}
+
+function extOf(name){
+  const m = name.match(/\.[^.]+$/);
+  return m ? m[0].toLowerCase() : '';
+}
+
+function digitsNeeded(){
+  return Math.max(3, String(items.length).length);
+}
+
+function newNameFor(idx){
+  const start = parseInt(document.getElementById('start-num').value, 10) || 1;
+  const prefix = document.getElementById('prefix').value.trim();
+  const num = String(start + idx).padStart(digitsNeeded(), '0');
+  const ext = extOf(items[idx].file.name) || '.jpg';
+  return (prefix ? prefix + '-' : '') + num + ext;
+}
+
+document.getElementById('pick-btn').addEventListener('click', () => {
+  document.getElementById('file-input').click();
+});
+
+document.getElementById('file-input').addEventListener('change', e => {
+  const files = Array.from(e.target.files);
+  if (!files.length) return;
+  files.sort((a, b) => naturalCompare(a.name, b.name));
+  items = files.map((f, i) => ({ file: f, id: i + '-' + Date.now() }));
+  render();
+});
+
+document.getElementById('reset-btn').addEventListener('click', () => {
+  items = [];
+  document.getElementById('file-input').value = '';
+  render();
+});
+
+document.getElementById('start-num').addEventListener('input', render);
+document.getElementById('prefix').addEventListener('input', render);
+
+function move(idx, dir){
+  const target = idx + dir;
+  if (target < 0 || target >= items.length) return;
+  [items[idx], items[target]] = [items[target], items[idx]];
+  render();
+}
+
+function render(){
+  const list = document.getElementById('list');
+  const empty = document.getElementById('empty-state');
+  const countRow = document.getElementById('count-row');
+  const bottomBar = document.getElementById('bottom-bar');
+
+  if (!items.length){
+    list.innerHTML = '';
+    empty.style.display = 'block';
+    countRow.style.display = 'none';
+    bottomBar.style.display = 'none';
+    return;
+  }
+
+  empty.style.display = 'none';
+  countRow.style.display = 'flex';
+  bottomBar.style.display = 'flex';
+  document.getElementById('count-text').textContent = items.length + ' ảnh';
+  document.getElementById('status-text').textContent = 'Sẵn sàng tải ' + items.length + ' ảnh';
+
+  list.innerHTML = items.map((it, idx) => `
+    <div class="item">
+      <img src="${URL.createObjectURL(it.file)}" alt="">
+      <div class="names">
+        <div class="old">${it.file.name}</div>
+        <div class="new">→ ${newNameFor(idx)}</div>
+      </div>
+      <div class="arrows">
+        <button data-dir="-1" data-idx="${idx}" ${idx === 0 ? 'disabled' : ''}>▲</button>
+        <button data-dir="1" data-idx="${idx}" ${idx === items.length - 1 ? 'disabled' : ''}>▼</button>
+      </div>
+    </div>`).join('');
+
+  list.querySelectorAll('button[data-dir]').forEach(btn => {
+    btn.addEventListener('click', () => move(parseInt(btn.dataset.idx, 10), parseInt(btn.dataset.dir, 10)));
+  });
+}
+
+document.getElementById('download-btn').addEventListener('click', async () => {
+  const btn = document.getElementById('download-btn');
+  const status = document.getElementById('status-text');
+  btn.disabled = true;
+  status.textContent = 'Đang đóng gói...';
+
+  const zip = new JSZip();
+  items.forEach((it, idx) => zip.file(newNameFor(idx), it.file));
+
+  const blob = await zip.generateAsync({ type: 'blob' }, meta => {
+    status.textContent = `Đang nén... ${Math.round(meta.percent)}%`;
+  });
+
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'anh-da-sap-xep.zip';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+
+  status.textContent = 'Đã tải xong ' + items.length + ' ảnh';
+  btn.disabled = false;
+});
+</script>
+</body>
+</html>
